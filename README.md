@@ -13,6 +13,23 @@ L'Atelier est une plateforme logicielle complète (V4.5.0) conçue pour la conce
 - **Intégration KiCad / SKiDL** : Synchronisation des bibliothèques, recherche de composants, génération de netlists.
 - **Support Multi-Agents (Antigravity)** : Intégration profonde avec les agents IA pour automatiser la génération de code, la recherche de datasheets, et la manipulation des fichiers de conception.
 
+## Architecture du Projet (Python)
+
+L'organisation des modules Python du projet s'articule autour d'une interface graphique principale, et de scripts de préparation dédiés aux agents IA.
+
+```mermaid
+graph TD
+    Main["main.py<br>(Point d'entrée)"] --> UI("ui.py<br>(Interface Principale PyQt6)")
+    UI --> Scaffold("scaffold_projet.py<br>(Scaffolding & Configuration des Agents)")
+    UI --> PCB("pcbparts.py<br>(Client API composants)")
+    
+    Conv["convertisseur PDF-Json.py<br>(Outil autonome Tkinter)"]
+    
+    subgraph "Environnement du Projet (Workspace)"
+        Scaffold -.-> Kit[".agents/scripts/<br>(run_projet.py, kicad_search.py...)"]
+    end
+```
+
 ## Outils Inclus
 
 - `convertisseur PDF-Json.py` : Un outil autonome doté d'une interface graphique pour convertir les fiches techniques PDF en format JSON hybride (texte Markdown et extraction des images), spécifiquement pensé pour l'ingestion par les agents IA.

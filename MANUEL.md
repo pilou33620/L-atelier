@@ -25,7 +25,24 @@ Les agents (via l'intégration Antigravity) analysent votre projet et peuvent y 
 - Ils travaillent dans un dossier `.agents/` ajouté à votre projet lors de la préparation (scaffolding).
 - Vos fichiers sont sauvegardés dans le dossier `.agent_backups/` avant toute modification automatique par un agent ou l'interface. Les 20 dernières versions de chaque fichier sont conservées.
 
-## 4. Outils Auxiliaires
+## 4. Architecture de l'Application
+
+Voici une vue d'ensemble de la manière dont les différents scripts Python interagissent au sein du projet L'Atelier :
+
+```mermaid
+graph TD
+    Main["main.py<br>(Point d'entrée)"] --> UI("ui.py<br>(Interface Principale PyQt6)")
+    UI --> Scaffold("scaffold_projet.py<br>(Scaffolding & Configuration des Agents)")
+    UI --> PCB("pcbparts.py<br>(Client API composants)")
+    
+    Conv["convertisseur PDF-Json.py<br>(Outil autonome Tkinter)"]
+    
+    subgraph "Environnement du Projet (Workspace)"
+        Scaffold -.-> Kit[".agents/scripts/<br>(run_projet.py, kicad_search.py...)"]
+    end
+```
+
+## 5. Outils Auxiliaires
 
 ### Convertisseur PDF vers JSON
 Un outil est fourni pour extraire le texte (en Markdown) et les images des fiches techniques (datasheets) au format PDF, pour que les agents puissent les lire facilement.
