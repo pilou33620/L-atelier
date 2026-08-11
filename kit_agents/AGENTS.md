@@ -147,3 +147,7 @@ Un numéro de broche, une adresse I2C, une tension, une cote en millimètres ou 
 propriété de matériau inventés ne produisent pas une erreur visible : ils
 produisent un objet fabriqué et faux. Tout agent qui ne trouve pas une valeur le
 dit et s'arrête, plutôt que de combler le trou.
+
+## Règle transversale : nettoyage des fichiers temporaires
+
+Si un agent est amené à écrire des bouts de code, des scripts ou des fichiers pour effectuer des tests ou des modifications, **il doit impérativement nettoyer et supprimer ces fichiers temporaires après usage**. L'espace de travail ne doit pas être pollué par des fichiers inutiles ou obsolètes une fois la tâche de l'agent terminée.
