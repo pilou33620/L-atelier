@@ -30,18 +30,23 @@ except ImportError:
 # l'outil doit rester utilisable si le module n'est pas déployé.
 try:
     from scaffold_projet import (preparer_projet, mettre_a_jour_env,
-                                 kit_par_defaut, emplacements_kit, est_un_kit)
+                                 kit_par_defaut, emplacements_kit, est_un_kit,
+                                 OUTILS_CIBLES)
     SCAFFOLD_AVAILABLE = True
 except ImportError:
     SCAFFOLD_AVAILABLE = False
+    OUTILS_CIBLES = {
+        "antigravity": {"nom": "Antigravity (Gemini)", "dossier_agents": ".agents"},
+        "claude_code": {"nom": "Claude Code (Claude)", "dossier_agents": ".claude"},
+    }
 
-    def kit_par_defaut():
+    def kit_par_defaut(target_tool="antigravity"):
         return None
 
-    def emplacements_kit():
+    def emplacements_kit(target_tool="antigravity"):
         return []
 
-    def est_un_kit(_):
+    def est_un_kit(_, target_tool="antigravity"):
         return False
 
 # Client pcbparts.dev : recherche, tarifs, modèles KiCad. Les appels réseau se
@@ -551,27 +556,32 @@ class PythonHighlighter(QSyntaxHighlighter):
                 self.setFormat(m.start(), m.end() - m.start(), fmt)
 
 class ProjectLauncherDialog(QDialog):
-    """Fenêtre de dialogue pour choisir ou créer un projet."""
+    """Fenêtre de dialogue pour choisir ou créer un projet et sélectionner l'outil IA."""
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Choix du Projet")
+        self.setWindowTitle("Choix du Projet et Outil IA")
         self.setModal(True)
-        self.resize(350, 200)
+        self.resize(420, 420)
         
-        layout = QVBoxLayout(self)
+        reglages = QSettings("Antigravity", "LAtelierIA")
+        outil_memorise = reglages.value("target_tool", "antigravity", type=str)
 
-        layout.addWidget(QLabel("Choisissez une action :"))
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+
+        # --- 1. Groupe Domaine et Action ---
+        grp_mode = QGroupBox("1. Domaine & Action du projet")
+        mode_layout = QVBoxLayout(grp_mode)
+        mode_layout.setSpacing(6)
+
         self.mode_group = QButtonGroup(self)
         self.radio_new_coder = QRadioButton("Concevoir un nouveau projet code")
-        self.radio_edit_coder = QRadioButton("Modifier un projet code")
-        self.radio_new_hardware = QRadioButton("Concevoir une carte électronique")
-        self.radio_edit_hardware = QRadioButton("Reprendre une carte existante")
-        self.radio_new_meca = QRadioButton("Concevoir une pièce 3D")
-        self.radio_edit_meca = QRadioButton("Reprendre une pièce existante")
+        self.radio_edit_coder = QRadioButton("Modifier un projet code existant")
+        self.radio_new_hardware = QRadioButton("Concevoir une carte électronique (KiCad/SKiDL)")
+        self.radio_edit_hardware = QRadioButton("Reprendre une carte électronique existante")
+        self.radio_new_meca = QRadioButton("Concevoir une pièce 3D (CadQuery)")
+        self.radio_edit_meca = QRadioButton("Reprendre une pièce 3D existante")
 
-        # Les identifiants NEUFS créent un dossier, les identifiants EXISTANTS
-        # en ouvrent un. Le mode est déduit de la table ci-dessous : c'est lui
-        # qui décide de la famille d'agents installée dans le projet.
         self.mode_group.addButton(self.radio_new_coder, 1)
         self.mode_group.addButton(self.radio_edit_coder, 2)
         self.mode_group.addButton(self.radio_new_hardware, 3)
@@ -586,14 +596,39 @@ class ProjectLauncherDialog(QDialog):
         for radio in (self.radio_new_coder, self.radio_edit_coder,
                       self.radio_new_hardware, self.radio_edit_hardware,
                       self.radio_new_meca, self.radio_edit_meca):
-            layout.addWidget(radio)
+            mode_layout.addWidget(radio)
+        layout.addWidget(grp_mode)
 
+        # --- 2. Groupe Outil IA Cible ---
+        grp_tool = QGroupBox("2. Outil IA cible")
+        tool_layout = QVBoxLayout(grp_tool)
+        tool_layout.setSpacing(6)
+
+        self.tool_group = QButtonGroup(self)
+        self.radio_antigravity = QRadioButton("Antigravity (Gemini) — Dossier .agents/ & AGENTS.md")
+        self.radio_antigravity.setToolTip("Configure le projet pour Antigravity avec l'arborescence .agents/ et les 25 agents Gemini.")
+        self.radio_claude_code = QRadioButton("Claude Code (Claude) — Dossier .claude/ & CLAUDE.md")
+        self.radio_claude_code.setToolTip("Configure le projet pour Claude Code avec l'arborescence .claude/, CLAUDE.md et les commandes slash.")
+
+        self.tool_group.addButton(self.radio_antigravity, 1)
+        self.tool_group.addButton(self.radio_claude_code, 2)
+
+        if outil_memorise == "claude_code":
+            self.radio_claude_code.setChecked(True)
+        else:
+            self.radio_antigravity.setChecked(True)
+
+        tool_layout.addWidget(self.radio_antigravity)
+        tool_layout.addWidget(self.radio_claude_code)
+        layout.addWidget(grp_tool)
+
+        # --- 3. Option Scaffolding ---
         self.chk_preparer = QCheckBox(
             "Installer / mettre à jour le kit d'agents dans le projet")
         self.chk_preparer.setChecked(True)
         self.chk_preparer.setToolTip(
-            "Copie AGENTS.md et .agents/, retire les familles d'agents inutiles, "
-            "crée les dossiers attendus, construit l'index KiCad.")
+            "Installe les agents, adapte les workflows et scripts, crée les dossiers "
+            "attendus et prépare l'environnement rejouable pour l'IA.")
         self.chk_preparer.setEnabled(SCAFFOLD_AVAILABLE)
         if not SCAFFOLD_AVAILABLE:
             self.chk_preparer.setText(
@@ -609,10 +644,15 @@ class ProjectLauncherDialog(QDialog):
         layout.addWidget(btn_box)
 
         self.selected_app_mode = "coder"
+        self.selected_target_tool = "antigravity"
         self.selected_path = ""
 
     def accept(self):
         choice = self.mode_group.checkedId()
+        self.selected_target_tool = "claude_code" if self.radio_claude_code.isChecked() else "antigravity"
+
+        reglages = QSettings("Antigravity", "LAtelierIA")
+        reglages.setValue("target_tool", self.selected_target_tool)
 
         if choice in self.CHOIX_NEUF:
             parent_dir = QFileDialog.getExistingDirectory(self, "Sélectionnez le dossier parent")
@@ -646,26 +686,21 @@ class ProjectLauncherDialog(QDialog):
 
         super().accept()
 
-    # ------------------------------------------------------------------ #
-    #  Préparation du dossier pour Antigravity                            #
-    # ------------------------------------------------------------------ #
-    # Sans cette étape, le dossier créé est VIDE : ni AGENTS.md, ni .agents/,
-    # ni data_sheets/, ni index KiCad. Le kit d'agents suppose que tout ça est
-    # déjà là, donc Antigravity lancé sur ce dossier n'a aucun agent
-    # personnalisé et aucun garde-fou.
     def _preparer_pour_agents(self):
         reglages = QSettings("Antigravity", "LAtelierIA")
+        tool = self.selected_target_tool
+        nom_outil = "Claude Code" if tool == "claude_code" else "Antigravity"
 
-        # Un kit désigné à la main une fois ne doit plus jamais être redemandé.
-        memorise = reglages.value("kit_agents_path", "", type=str)
-        kit = memorise if (memorise and est_un_kit(memorise)) else kit_par_defaut()
+        kit_key = f"kit_agents_path_{tool}"
+        memorise = reglages.value(kit_key, "", type=str) or reglages.value("kit_agents_path", "", type=str)
+        kit = memorise if (memorise and est_un_kit(memorise, target_tool=tool)) else kit_par_defaut(target_tool=tool)
 
         if kit is None:
-            consultes = "\n".join("  • " + str(c) for c in emplacements_kit())
+            consultes = "\n".join("  • " + str(c) for c in emplacements_kit(target_tool=tool))
             reponse = QMessageBox.question(
-                self, "Kit d'agents introuvable",
-                "Aucun dossier contenant à la fois AGENTS.md et .agents/ n'a été "
-                f"trouvé.\n\nEmplacements consultés :\n{consultes}\n\n"
+                self, f"Kit d'agents introuvable ({nom_outil})",
+                f"Aucun dossier valide pour {nom_outil} n'a été trouvé.\n\n"
+                f"Emplacements consultés :\n{consultes}\n\n"
                 "Voulez-vous le désigner maintenant ? Le chemin sera mémorisé.\n"
                 "Répondre « Non » ouvre le projet sans agents.",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
@@ -673,28 +708,27 @@ class ProjectLauncherDialog(QDialog):
             if reponse != QMessageBox.StandardButton.Yes:
                 return True
             dossier = QFileDialog.getExistingDirectory(
-                self, "Dossier du kit d'agents (contenant AGENTS.md et .agents/)")
+                self, f"Dossier du kit d'agents pour {nom_outil}")
             if not dossier:
                 return True
-            if not est_un_kit(dossier):
+            if not est_un_kit(dossier, target_tool=tool):
                 QMessageBox.warning(
-                    self, "Ce n'est pas un kit",
-                    f"{dossier}\n\nne contient pas AGENTS.md et .agents/. "
+                    self, "Ce n'est pas un kit valide",
+                    f"{dossier}\n\nne contient pas de configuration valide pour {nom_outil}. "
                     "Le projet est ouvert sans agents.")
                 return True
             kit = dossier
 
-        reglages.setValue("kit_agents_path", str(kit))
+        reglages.setValue(kit_key, str(kit))
 
         rapport = preparer_projet(self.selected_path, self.selected_app_mode,
+                                  target_tool=tool,
                                   kit_source=kit)
         texte = "\n".join(rapport.lignes) or "Rien à faire."
         if rapport.succes:
-            QMessageBox.information(self, "Projet préparé", texte)
+            QMessageBox.information(self, f"Projet préparé pour {nom_outil}", texte)
             return True
 
-        # Un échec ici n'est pas toujours bloquant : l'index KiCad peut manquer
-        # simplement parce que les chemins ne sont pas encore renseignés.
         reponse = QMessageBox.warning(
             self, "Préparation incomplète",
             texte + "\n\nOuvrir le projet quand même ?",
@@ -703,15 +737,16 @@ class ProjectLauncherDialog(QDialog):
         return reponse == QMessageBox.StandardButton.Yes
 
     def get_selection(self):
-        return self.selected_app_mode, self.selected_path
+        return self.selected_app_mode, self.selected_path, self.selected_target_tool
 
 
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, app_mode="coder"):
+    def __init__(self, app_mode="coder", target_tool="antigravity"):
         super().__init__()
         self.app_mode = app_mode
+        self.target_tool = target_tool
         self.setWindowTitle("L'Atelier — V4.5.0")
         self.resize(1400, 860)
 
@@ -1181,7 +1216,7 @@ git push -u origin main</pre>"""
             QMessageBox.warning(self, "Erreur", "Ouvre d'abord un dossier projet.")
             return
 
-        rapport = mettre_a_jour_env(self.project_root, self.env_kicad or {})
+        rapport = mettre_a_jour_env(self.project_root, self.env_kicad or {}, target_tool=self.target_tool)
         self.afficher_rapport_preparation(rapport)
         if rapport.succes:
             QMessageBox.information(self, "Environnement agents",
@@ -1795,6 +1830,8 @@ class HardwarePanel(QWidget):
             return
 
         script = os.path.join(racine, ".agents", "scripts", "kicad_fetch_part.py")
+        if not os.path.isfile(script):
+            script = os.path.join(racine, ".claude", "scripts", "kicad_fetch_part.py")
         if not os.path.isfile(script):
             QMessageBox.warning(
                 self, "Script absent",

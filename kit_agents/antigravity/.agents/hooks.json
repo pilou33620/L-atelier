@@ -1,0 +1,17 @@
+{
+  "garde-fou-projet": {
+    "enabled": true,
+    "PreToolUse": [
+      {
+        "matcher": "run_command|write_to_file|replace_file_content|multi_replace_file_content",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .agents/hooks/garde_fou.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

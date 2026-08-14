@@ -24,9 +24,13 @@ if __name__ == "__main__":
 
     dialog = ProjectLauncherDialog()
     if dialog.exec() == QDialog.DialogCode.Accepted:
-        app_mode, target_directory = dialog.get_selection()
+        selection = dialog.get_selection()
+        app_mode = selection[0]
+        target_directory = selection[1]
+        target_tool = selection[2] if len(selection) > 2 else "antigravity"
         
-        window = MainWindow(app_mode=app_mode)
+        logger.info(f"[LOG - SYSTEM] Mode: '{app_mode}', Cible IA: '{target_tool}'")
+        window = MainWindow(app_mode=app_mode, target_tool=target_tool)
         window.show()
 
         if target_directory:

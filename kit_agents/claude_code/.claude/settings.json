@@ -1,0 +1,13 @@
+{
+  "allowedTools": [
+    "View",
+    "Edit",
+    "Write",
+    "Bash",
+    "Glob",
+    "Grep",
+    "LS",
+    "Task",
+    "AskQuestion"
+  ]
+}
