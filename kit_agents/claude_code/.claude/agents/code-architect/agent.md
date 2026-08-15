@@ -83,6 +83,17 @@ questions :
    ne pas oublier (saisie manuelle, import, migration, fixtures).
 6. Ce qui devra être validé par un humain, s'il y a du visuel.
 
+### Découpage obligatoire multi-fichiers (> 2 fichiers)
+
+Si la solution implique **plus de 2 fichiers** à créer ou modifier (> 2 fichiers, soit dès 3 fichiers) :
+
+- Découpe obligatoirement le plan en **passes séquentielles numérotées** (Passe 1 -> Fichier 1, Passe 2 -> Fichier 2, etc.).
+- Pour chaque passe, précise :
+  1. Le chemin exact du fichier cible.
+  2. Les contrats, signatures, classes ou fonctions à implémenter.
+  3. Les dépendances envers les fichiers créés lors des passes précédentes.
+- Ce découpage permet à l'orchestrateur de lancer des sous-agents `code-coder` ciblés (Option B) pour garantir un contexte ultra-propre et sans dérive.
+
 Ne recopie PAS le plan dans ton message final. Dis simplement :
 « Plan publié dans `.agent_reports/code-architect.md` », avec l'objectif en une ligne
 et le nombre de fichiers concernés.

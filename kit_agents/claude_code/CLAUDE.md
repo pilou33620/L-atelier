@@ -50,6 +50,9 @@ reformatage global noie le diff et rend la revue impossible.
 Chaque famille est étanche : un orchestrateur ne délègue qu'aux spécialistes de
 son domaine. Le manuel complet est dans `.claude/MANUEL.md`.
 
+**Règle d'implémentation multi-fichiers (> 2 fichiers)** : Tout lot de 3 fichiers ou plus est obligatoirement découpé en passes séquentielles ordonnées par l'Architecte et exécuté passe par passe par l'Orchestrateur (un appel codeur dédié par fichier avec contrôle intermédiaire) afin de garantir un contexte propre et sans pollution.
+
+
 ## Protocole Multi-Agents & Rapports Déterministes
 
 Tous les rapports sont stockés dans `.agent_reports/<agent_name>.md` :

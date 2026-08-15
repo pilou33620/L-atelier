@@ -128,3 +128,14 @@ Raison : deux agents qui délèguent en parallèle sur les mêmes fichiers
 produisent deux boucles de correction concurrentes, sans plafond et sans
 personne qui ait la vue d'ensemble. Un spécialiste qui a besoin d'un autre rôle
 termine par `BLOQUE` en nommant le rôle attendu.
+
+## 8. Règle multi-fichiers (> 2 fichiers) : Passes unitaires obligatoires
+
+Dès qu'une tâche nécessite d'écrire ou modifier **plus de 2 fichiers** (> 2 fichiers, soit dès 3 fichiers) :
+
+- **Interdiction du bloc monolithique** : L'orchestrateur ne doit JAMAIS déléguer la création ou modification de 3 fichiers ou plus en un seul appel/prompt à un unique sous-agent codeur.
+- **Découpage strict par l'Architecte** : Le plan d'architecture (`.agent_reports/code-architect.md` ou `hw-architect.md`) doit obligatoirement découper le travail en **passes séquentielles numérotées et ordonnées** (Passe 1 -> Fichier 1, Passe 2 -> Fichier 2, etc.), avec contrats d'interfaces et signatures explicites.
+- **Délégation séquentielle ciblée par l'Orchestrateur** : L'orchestrateur appelle un agent codeur par fichier (ou passe unitaire) de façon séquentielle avec un prompt focalisé (Option B), garantissant un contexte propre et sans dérive.
+- **Vérification intermédiaire sur disque** : L'orchestrateur vérifie la présence physique et la complétude du fichier sur le disque avant de déclencher la passe suivante.
+- **Revue globale finale** : Une fois toutes les passes terminées, le `code-reviewer` audite l'ensemble du livrable pour valider la cohérence globale.
+

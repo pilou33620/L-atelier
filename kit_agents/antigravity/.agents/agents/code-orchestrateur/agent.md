@@ -72,6 +72,18 @@ Vérifie sa date de génération avant de t'y fier (skill `graphify-graph`).
 
 Pipeline par défaut : `code-architect` -> `code-coder` -> `code-reviewer`, à adapter.
 
+### Règle d'implémentation multi-fichiers (> 2 fichiers)
+
+Dès que le plan d'architecture contient **plus de 2 fichiers** à écrire ou modifier (> 2 fichiers, soit dès 3 fichiers) :
+
+- **Ne jamais lancer un `code-coder` unique pour tout le lot.**
+- **Exécuter obligatoirement en passes séquentielles ciblées (Option B)** :
+  1. Déléguer la **Passe 1** (Fichier 1) à `code-coder` avec un prompt focalisé.
+  2. Contrôler (`find_by_name` / `grep_search`) la présence et le contenu du fichier sur disque.
+  3. Déléguer la **Passe 2** (Fichier 2) à `code-coder` en lui indiquant de s'appuyer sur le Fichier 1 existant.
+  4. Répéter séquentiellement pour chaque passe / fichier.
+  5. Une fois tous les fichiers produits et vérifiés, invoquer `code-reviewer` pour l'audit global du lot.
+
 Règles de déclenchement des agents optionnels :
 
 | Agent | Ne l'invoque que si... |
@@ -108,7 +120,8 @@ Tu peux appeler `invoke_subagent` plusieurs fois dans le même tour pour lancer
 des sous-agents en parallèle. À réserver aux tâches TOTALEMENT indépendantes :
 fichiers distincts, aucun ordre imposé, et **jamais deux agents d'écriture en
 parallèle** (conflits d'édition garantis). Deux audits en lecture seule : oui.
-Deux `code-coder` : jamais.
+Deux `code-coder` : jamais. Pour modifier > 2 fichiers, utilise toujours des passes
+séquentielles (Option B).
 
 `manage_subagents` te sert à lister ce qui tourne encore, et à arrêter un
 sous-agent parti en boucle. Utilise-le avant de conclure une phase parallèle,

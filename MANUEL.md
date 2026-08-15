@@ -28,7 +28,9 @@ L'interface de L'Atelier est divisée en plusieurs panneaux :
 Les agents analysent votre projet et y apportent des modifications de manière sécurisée.
 - **Pour Antigravity** : Ils travaillent dans le dossier `.agents/` et se coordonnent via `.agent_reports/`.
 - **Pour Claude Code** : Ils utilisent le dossier `.claude/`, le fichier `CLAUDE.md` et les commandes slash (`/code-feature`, `/hw-carte`, `/meca-piece`, etc.).
+- **Règle Multi-Fichiers (> 2 fichiers)** : Dès qu'une modification requiert plus de 2 fichiers (dès 3 fichiers), les kits d'agents imposent le découpage séquentiel en passes ciblées (Option B). L'Architecte sépare le travail en passes ordonnées, l'Orchestrateur pilote un agent d'écriture par passe avec un contexte épuré et contrôle la création sur disque, puis le Reviewer valide le tout.
 - Vos fichiers sont sauvegardés dans le dossier `.agent_backups/` avant toute modification automatique par un agent ou l'interface. Les 20 dernières versions de chaque fichier sont conservées.
+
 
 ## 4. Architecture de l'Application
 

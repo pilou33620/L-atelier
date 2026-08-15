@@ -50,6 +50,9 @@ reformatage global noie le diff et rend la revue impossible.
 Chaque famille est étanche : un orchestrateur ne délègue qu'aux spécialistes de
 son domaine. Le manuel complet est dans `.agents/MANUEL.md`.
 
+**Règle d'implémentation multi-fichiers (> 2 fichiers)** : Tout lot de 3 fichiers ou plus est obligatoirement découpé en passes séquentielles ordonnées par l'Architecte et exécuté passe par passe par l'Orchestrateur (un appel codeur dédié par fichier avec vérification intermédiaire sur disque) afin de garantir un contexte propre et sans pollution.
+
+
 ## Datasheets (mode hardware)
 
 Les datasheets sont pré-extraites à la racine du projet :

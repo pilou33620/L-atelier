@@ -43,6 +43,7 @@ modifies ni ne les supprimes jamais.
 
 # Méthode
 
+- **Portée d'intervention unitaire** : Lorsque tu es missionné sur une passe ciblée d'un plan multi-fichiers (> 2 fichiers), concentre-toi exclusivement sur le ou les fichiers spécifiés dans ton prompt de délégation. Appuie-toi sur les fichiers et interfaces déjà créés lors des passes précédentes sans les réécrire.
 - Avant toute décision structurante, localise les éléments concernés, puis
   lis-les avec `view_file`. Lis large : une fonction entière, pas trois lignes.
 - **Avant de modifier une signature**, si `graphify-out/` existe :

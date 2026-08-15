@@ -31,8 +31,12 @@ d'aller plus loin. Ne pas coder sur un plan incomplet.
 
 ## 3. Implémenter
 
-Invoquer `code-coder` avec l'identifiant de mission, en lui demandant de lire
-`.agent_reports/code-architect.md`.
+- **Si $\le 2$ fichiers** : Invoquer `code-coder` avec l'identifiant de mission, en lui demandant de lire `.agent_reports/code-architect.md`.
+- **Si $> 2$ fichiers (dès 3 fichiers)** : Appliquer obligatoirement les passes séquentielles (Option B) :
+  1. Invoquer `code-coder` pour la Passe 1 (Fichier 1).
+  2. Vérifier la présence du fichier sur disque (`find_by_name` / `grep_search`).
+  3. Invoquer `code-coder` pour la Passe 2 (Fichier 2) en s'appuyant sur le Fichier 1.
+  4. Répéter pour chaque passe jusqu'au dernier fichier.
 
 ## 4. Relire
 
