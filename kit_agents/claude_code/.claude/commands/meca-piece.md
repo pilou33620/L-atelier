@@ -8,13 +8,12 @@ description: Conception d'une piece ou d'un assemblage 3D CadQuery (lead -> mate
 
 Mode conception mécanique 3D, piloté par `meca-orchestrateur`.
 
-## 0. Ouverture de mission
+## 0. Ouverture de mission & Spécification Ingress
 
+- Si `.agent_reports/spec_ingress.md` est présent ou qu'une spécification a été produite par `spec-translator`, s'appuyer sur ses exigences géométriques, cotes et contraintes de fabrication.
+- **Vérifier qu'on a les cotes.** Consulter la section `## 5. Assumptions & Open Questions` : dimensions, jeux fonctionnels, méthode de fabrication, contraintes d'assemblage. Si ça manque, `AskQuestion` MAINTENANT : une cote inventée donne une pièce qui ne s'assemble pas.
 - Identifiant de mission (`AAAA-MM-JJ-slug`), annoncé.
-- `list_dir` sur `.agent_reports/` : écarter les rapports périmés.
-- **Vérifier qu'on a les cotes.** Dimensions, jeux fonctionnels, méthode de
-  fabrication, contraintes d'assemblage. Si ça manque, `ask_question`
-  MAINTENANT : une cote inventée donne une pièce qui ne s'assemble pas.
+- `LS` sur `.agent_reports/` : écarter les rapports périmés.
 
 ## 1. Cahier des charges
 

@@ -6,14 +6,13 @@ description: Cycle complet d'ajout de fonctionnalite (architecte -> codeur -> re
 
 Mode conception de fonctionnalité, piloté par l'`code-orchestrateur`.
 
-## 0. Ouverture de mission
+## 0. Ouverture de mission & Spécification Ingress
 
+- Si `.agent_reports/spec_ingress.md` est présent ou qu'une spécification a été produite par `spec-translator`, s'appuyer sur ses exigences, contraintes strictes et fichiers cartographiés.
+- Vérifier la section `## 5. Assumptions & Open Questions` : si un point bloquant subsiste, poser la question avec `ask_question` MAINTENANT. Seul l'agent principal peut questionner sans risque de timeout.
 - Fabriquer l'identifiant de mission (`AAAA-MM-JJ-slug`) et l'annoncer.
 - `list_dir` sur `.agent_reports/` : tout rapport portant un autre identifiant
   est périmé. Le signaler et ne pas s'en servir.
-- Si la demande est ambiguë sur un point structurant, poser les questions avec
-  `ask_question` MAINTENANT. Seul l'agent principal peut questionner sans risque
-  de timeout.
 
 ## 1. Localiser
 

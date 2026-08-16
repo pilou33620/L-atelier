@@ -6,14 +6,14 @@ description: Conception complete d'une carte electronique (architecte -> composa
 
 Mode conception de carte électronique, piloté par `hw-orchestrateur`.
 
-## 0. Ouverture de mission
+## 0. Ouverture de mission & Spécification Ingress
 
+- Si `.agent_reports/spec_ingress.md` est présent ou qu'une spécification a été produite par `spec-translator`, s'appuyer sur ses exigences fonctionnelles, tensions, contraintes et composants ciblés.
+- Vérifier la section `## 5. Assumptions & Open Questions` : si la tension d'alimentation, les interfaces, les broches ou le budget sont flous, `ask_question` MAINTENANT.
 - Identifiant de mission (`AAAA-MM-JJ-slug`), annoncé.
 - `list_dir` sur `data_sheets/` : quels composants sont documentés ? Un composant
   attendu sans datasheet est un risque à signaler dès maintenant.
 - `list_dir` sur `.agent_reports/` : écarter explicitement les rapports périmés.
-- Si la tension d'alimentation, les interfaces, les contraintes de taille ou le
-  budget sont flous, `ask_question` MAINTENANT.
 
 ## 1. Architecture
 

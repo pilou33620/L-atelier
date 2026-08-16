@@ -82,10 +82,10 @@ SKILLS_PAR_FAMILLE = {
 }
 
 SCRIPTS_PAR_FAMILLE = {
-    "code": ["run_projet.py", "graph_query.py"],
+    "code": ["run_projet.py", "graph_query.py", "spec_ingress.py"],
     "hw": ["run_projet.py", "kicad_search.py", "kicad_fetch_part.py",
-           "pcbparts.py"],
-    "meca": ["run_projet.py", "cq_check.py"],
+           "pcbparts.py", "spec_ingress.py"],
+    "meca": ["run_projet.py", "cq_check.py", "spec_ingress.py"],
 }
 
 DOSSIERS_PAR_FAMILLE = {

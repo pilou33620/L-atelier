@@ -30,6 +30,7 @@ vérification. Aucun agent ne doit deviner une chaîne d'outils.
 | Index des librairies KiCad | `python .agents/scripts/kicad_search.py --index` |
 | Recherche empreinte KiCad | `python .agents/scripts/kicad_search.py footprint "<motif>"` |
 | Recherche symbole KiCad | `python .agents/scripts/kicad_search.py symbol "<motif>"` |
+| Gestionnaire d'entrée & mémoire | `python .agents/scripts/spec_ingress.py --history` |
 
 Le formatage ne doit jamais être lancé sur tout le dépôt d'un coup : un
 reformatage global noie le diff et rend la revue impossible.
@@ -38,6 +39,10 @@ reformatage global noie le diff et rend la revue impossible.
 
 - Dossier des tests : `tests/`
 - Motif des fichiers : `test_*.py`
+
+## Passerelle d'entrée transversale (Step 0)
+
+Avant même l'intervention d'un orchestrateur, l'agent **`spec-translator`** (Passerelle d'entrée) ingère les demandes et cahiers des charges rédigés en français, résout le contexte conversationnel (fenêtre glissante des 2-3 derniers tours) et mappe les fichiers réels du projet pour produire une spécification technique standardisée en anglais dans `.agent_reports/spec_ingress.md`.
 
 ## Les trois modes
 

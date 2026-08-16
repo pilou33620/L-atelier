@@ -27,8 +27,13 @@ Conséquences pratiques :
 
 1. Tu choisis l'agent principal correspondant au domaine (`code-orchestrateur`,
    `hw-orchestrateur` ou `meca-orchestrateur`).
-2. Tu formules ta demande, ou tu tapes la commande slash du workflow.
-3. Tu restes dans cette conversation. C'est l'orchestrateur qui invoque les
+2. Tu formules ta demande en français (expression libre, bug report, CDC complet),
+   ou tu tapes la commande slash du workflow.
+3. L'agent transversal **`spec-translator`** (PreWorkflow Step 0) transforme
+   automatiquement ta demande en spécification technique anglaise normée
+   (`.agent_reports/spec_ingress.md`), résout l'historique récent et mappe les
+   vrais fichiers du projet.
+4. Tu restes dans cette conversation. C'est l'orchestrateur qui invoque les
    spécialistes ; tu ne changes pas d'agent en cours de route.
 
 Tu ne changes d'agent principal que pour zapper volontairement l'orchestrateur, sur
@@ -55,7 +60,10 @@ Les agents terminent par un token exact, sur lequel l'orchestrateur route :
    d'interaction court et leur question expirerait.
 4. **Jamais deux agents d'écriture en parallèle.**
 5. **Jamais d'invention d'une valeur physique** : broche, tension, cote, propriété
-   de matériau. On dit qu'on n'a pas trouvé, et on s'arrête.
+   de matériau. Toute valeur manquante est isolée dans `Assumptions & Open Questions`
+   de la spécification d'entrée et validée avant exécution.
+6. **Passerelle linguistique étanche** : Toute consigne métier est traduite en
+   anglais d'ingénierie normé avant transmission aux spécialistes.
 
 ---
 
