@@ -46,10 +46,12 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 
 # --------------------------------------------------------------------------
@@ -72,6 +74,208 @@ OUTILS_CIBLES = {
         "sous_dossier_kit": "claude_code",
     },
 }
+
+# --------------------------------------------------------------------------
+# Modèles IA & Presets supportés (Gemini / Antigravity & Claude / Claude Code)
+# --------------------------------------------------------------------------
+
+MODELES_DISPONIBLES_PAR_OUTIL = {
+    "antigravity": [
+        ("inherit", "Hérité (Défaut du système Gemini)"),
+        ("flash_lite", "Gemini Flash-Lite (Ultra-léger & ultra-rapide)"),
+        ("flash", "Gemini Flash (Rapide, économique, aiguillage/revue)"),
+        ("pro", "Gemini Pro (Raisonnement avancé, architecture/code)"),
+    ],
+    "claude_code": [
+        ("inherit", "Hérité (Défaut de la session Claude)"),
+        ("haiku", "Claude 3.5 Haiku (Rapide, économique, aiguillage/revue)"),
+        ("sonnet", "Claude 3.5 Sonnet (Recommandé : architecture, code & précision)"),
+        ("opus", "Claude 3 Opus (Raisonnement maximal & réflexion approfondie)"),
+    ],
+}
+
+MODELES_DISPONIBLES = MODELES_DISPONIBLES_PAR_OUTIL["antigravity"]
+
+DESCRIPTIONS_AGENTS = {
+    # Famille Code
+    "code-orchestrateur": "Aiguilleur / Manager - Analyse et délègue",
+    "code-architect": "Architecte Logiciel - Conçoit l'architecture et les specs",
+    "code-coder": "Développeur - Implémente et modifie le code",
+    "code-reviewer": "Revue de Code - Audite et valide les modifications",
+    "code-debugger": "Débogueur - Diagnostique et corrige les anomalies",
+    "code-security": "Sécurité & Robustesse - Audite les failles et entrées sensibles",
+    "code-analyst": "Analyste de Code - Explore et explique la base de code",
+    "code-documentalist": "Documentaliste - Rédige docstrings, README et manuels",
+    "code-tech-lead": "Tech Lead - Oriente les choix de librairies et refontes",
+    "code-test-writer": "Rédacteur de Tests - Écrit la suite de tests pytest",
+    "code-consistency-checker": "Vérificateur de Cohérence - Harmonise signatures et usages",
+    # Famille Hardware
+    "hw-orchestrateur": "Aiguilleur Hardware - Coordonne la conception électronique",
+    "hw-architect": "Architecte Hardware - Conçoit les schémas et l'architecture",
+    "hw-coder-skidl": "Codeur SKiDL - Rédige le code Python netlist KiCad",
+    "hw-erc-drc": "Vérificateur DRC/ERC - Contrôle les règles de conception",
+    "hw-component": "Expert Composants - Analyse datasheets et sélectionne les pièces",
+    "hw-calculator": "Calculateur - Dimensionne alimentations, filtres et puissances",
+    "hw-footprint": "Gestionnaire Empreintes - Recherche et assigne les empreintes KiCad",
+    "hw-documentalist": "Documentaliste Hardware - Rédige manuel de carte et BOM",
+    # Famille Mécanique
+    "meca-orchestrateur": "Aiguilleur Mécanique - Coordonne la modélisation 3D",
+    "meca-lead": "Lead Mécanique - Définit cinématique et contraintes",
+    "meca-designer": "Modélisateur CadQuery - Rédige le code 3D (STEP/STL)",
+    "meca-reviewer": "Revue Mécanique - Contrôle tolérances, épaisseurs et faisabilité",
+    "meca-materials": "Expert Matériaux - Sélectionne matières et procédés d'usinage",
+    # Transversal
+    "spec-translator": "Passerelle Spécifications - Ingestion FR -> specs techniques EN",
+    "minimal": "Agent Minimaliste - Diagnostic léger",
+}
+
+# Profil recommandé Antigravity (Gemini)
+PRESET_EQUILIBRE_GEMINI = {
+    # Code
+    "code-orchestrateur": "flash",
+    "code-architect": "pro",
+    "code-coder": "pro",
+    "code-reviewer": "flash",
+    "code-debugger": "pro",
+    "code-security": "pro",
+    "code-analyst": "flash",
+    "code-documentalist": "flash",
+    "code-tech-lead": "pro",
+    "code-test-writer": "flash",
+    "code-consistency-checker": "flash",
+    # Hardware
+    "hw-orchestrateur": "flash",
+    "hw-architect": "pro",
+    "hw-coder-skidl": "pro",
+    "hw-erc-drc": "flash",
+    "hw-component": "flash",
+    "hw-calculator": "pro",
+    "hw-footprint": "flash",
+    "hw-documentalist": "flash",
+    # Mécanique
+    "meca-orchestrateur": "flash",
+    "meca-lead": "pro",
+    "meca-designer": "pro",
+    "meca-reviewer": "flash",
+    "meca-materials": "flash",
+    # Transversal
+    "spec-translator": "flash",
+    "minimal": "inherit",
+}
+
+# Profil recommandé Claude Code (Claude)
+PRESET_EQUILIBRE_CLAUDE = {
+    # Code
+    "code-orchestrateur": "haiku",
+    "code-architect": "sonnet",
+    "code-coder": "sonnet",
+    "code-reviewer": "haiku",
+    "code-debugger": "sonnet",
+    "code-security": "sonnet",
+    "code-analyst": "haiku",
+    "code-documentalist": "haiku",
+    "code-tech-lead": "sonnet",
+    "code-test-writer": "haiku",
+    "code-consistency-checker": "haiku",
+    # Hardware
+    "hw-orchestrateur": "haiku",
+    "hw-architect": "sonnet",
+    "hw-coder-skidl": "sonnet",
+    "hw-erc-drc": "haiku",
+    "hw-component": "haiku",
+    "hw-calculator": "sonnet",
+    "hw-footprint": "haiku",
+    "hw-documentalist": "haiku",
+    # Mécanique
+    "meca-orchestrateur": "haiku",
+    "meca-lead": "sonnet",
+    "meca-designer": "sonnet",
+    "meca-reviewer": "haiku",
+    "meca-materials": "haiku",
+    # Transversal
+    "spec-translator": "haiku",
+    "minimal": "inherit",
+}
+
+PRESET_EQUILIBRE = PRESET_EQUILIBRE_GEMINI
+
+PRESETS_MODELES_PAR_OUTIL = {
+    "antigravity": {
+        "equilibre": {
+            "id": "equilibre",
+            "nom": "⚖️ Équilibré (Recommandé : Orchestrateur Flash + Architecte/Codeur Pro + Reviewer Flash)",
+            "mapping": PRESET_EQUILIBRE_GEMINI,
+        },
+        "rapide": {
+            "id": "rapide",
+            "nom": "⚡ Rapide (Tout en Gemini Flash)",
+            "mapping": {k: "flash" for k in PRESET_EQUILIBRE_GEMINI},
+        },
+        "precision": {
+            "id": "precision",
+            "nom": "🧠 Haute Précision (Tout en Gemini Pro)",
+            "mapping": {k: "pro" for k in PRESET_EQUILIBRE_GEMINI},
+        },
+        "defaut": {
+            "id": "defaut",
+            "nom": "🔄 Par Défaut (Tout en Hérité / inherit)",
+            "mapping": {k: "inherit" for k in PRESET_EQUILIBRE_GEMINI},
+        },
+    },
+    "claude_code": {
+        "equilibre": {
+            "id": "equilibre",
+            "nom": "⚖️ Équilibré (Recommandé : Orchestrateur Haiku + Architecte/Codeur Sonnet + Reviewer Haiku)",
+            "mapping": PRESET_EQUILIBRE_CLAUDE,
+        },
+        "rapide": {
+            "id": "rapide",
+            "nom": "⚡ Rapide (Tout en Claude 3.5 Haiku)",
+            "mapping": {k: "haiku" for k in PRESET_EQUILIBRE_CLAUDE},
+        },
+        "precision": {
+            "id": "precision",
+            "nom": "🧠 Haute Précision (Tout en Claude 3.5 Sonnet)",
+            "mapping": {k: "sonnet" for k in PRESET_EQUILIBRE_CLAUDE},
+        },
+        "defaut": {
+            "id": "defaut",
+            "nom": "🔄 Par Défaut (Tout en Hérité / inherit)",
+            "mapping": {k: "inherit" for k in PRESET_EQUILIBRE_CLAUDE},
+        },
+    },
+}
+
+PRESETS_MODELES = PRESETS_MODELES_PAR_OUTIL["antigravity"]
+
+def obtenir_modeles_disponibles(target_tool: str = "antigravity") -> list[tuple[str, str]]:
+    """Retourne la liste des modèles LLM disponibles pour l'outil IA spécifié."""
+    outil = normaliser_outil(target_tool)
+    return MODELES_DISPONIBLES_PAR_OUTIL.get(outil, MODELES_DISPONIBLES_PAR_OUTIL["antigravity"])
+
+def obtenir_presets_modele(target_tool: str = "antigravity") -> dict:
+    """Retourne les presets disponibles pour l'outil IA spécifié."""
+    outil = normaliser_outil(target_tool)
+    return PRESETS_MODELES_PAR_OUTIL.get(outil, PRESETS_MODELES_PAR_OUTIL["antigravity"])
+
+def liste_agents_famille(famille: str) -> list[str]:
+    """Retourne la liste ordonnée des agents appartenant à une famille (code, hw, meca)."""
+    prefix = famille + "-"
+    agents = [ag for ag in DESCRIPTIONS_AGENTS if ag.startswith(prefix)]
+    if "spec-translator" not in agents:
+        agents.append("spec-translator")
+    return sorted(agents)
+
+def obtenir_mapping_effectif(preset: str = "equilibre", surcharges: dict[str, str] | None = None,
+                             target_tool: str = "antigravity") -> dict[str, str]:
+    """Calcule le mapping effectif des modèles en combinant le preset et les surcharges éventuelles pour l'outil cible."""
+    outil = normaliser_outil(target_tool)
+    presets = PRESETS_MODELES_PAR_OUTIL.get(outil, PRESETS_MODELES_PAR_OUTIL["antigravity"])
+    base = dict(presets.get(preset, presets.get("equilibre", {}))["mapping"])
+    if surcharges:
+        base.update(surcharges)
+    return base
+
 
 SKILLS_PAR_FAMILLE = {
     "code": ["protocole-multi-agents", "verification-python", "graphify-graph"],
@@ -724,12 +928,255 @@ def _index_kicad(racine: Path, env_kicad: dict, target_tool: str, rapport: Rappo
 
 
 # --------------------------------------------------------------------------
+# Gestion des Modèles LLM, Activation & Synchronisation des Agents
+# --------------------------------------------------------------------------
+
+
+def appliquer_modeles_agents(racine: Path, famille: str = "code", target_tool: str = "antigravity",
+                             modeles: dict[str, str] | None = None, preset: str = "equilibre",
+                             agents_actifs: set[str] | list[str] | None = None,
+                             rapport: Rapport | None = None) -> Rapport:
+    """Applique les modèles LLM configurés aux agents du projet :
+    1. Met à jour le champ 'model:' dans le frontmatter YAML de chaque agent.md.
+    2. Adapte le prompt de délégation de l'orchestrateur pour forcer Model="..." dans invoke_subagent.
+    3. Documente la matrice des modèles dans AGENTS.md / CLAUDE.md.
+    4. Enregistre la configuration dans .agents/cache/models.json.
+    """
+    if rapport is None:
+        rapport = Rapport()
+
+    outil = normaliser_outil(target_tool)
+    dossier_nom = OUTILS_CIBLES[outil]["dossier_agents"]
+    racine_agents = racine / dossier_nom
+    if not racine_agents.is_dir():
+        # Repli si .agents ou .claude existe
+        racine_agents = racine / ".agents" if (racine / ".agents").is_dir() else (racine / ".claude")
+
+    dossier_agents = racine_agents / "agents"
+    if not dossier_agents.is_dir():
+        rapport.alerte(f"Dossier agents introuvable dans {racine_agents.name} : modèles non appliqués.")
+        return rapport
+
+    mapping_complet = obtenir_mapping_effectif(preset, modeles, target_tool=outil)
+    modifies = 0
+
+    presents = {d.name for d in dossier_agents.iterdir() if d.is_dir()}
+    if agents_actifs is not None:
+        presents &= set(agents_actifs)
+
+    # 1. Mise à jour du frontmatter YAML dans chaque agent.md
+    for agent_dir in sorted(dossier_agents.iterdir()):
+        if not agent_dir.is_dir():
+            continue
+        agent_name = agent_dir.name
+        agent_md = agent_dir / "agent.md"
+        if not agent_md.is_file():
+            continue
+
+        target_model = mapping_complet.get(agent_name, "inherit")
+        contenu = agent_md.read_text(encoding="utf-8")
+
+        if contenu.startswith("---"):
+            parties = contenu.split("---", 2)
+            if len(parties) >= 3:
+                frontmatter = parties[1]
+                body = parties[2]
+                if re.search(r"^model:\s*.*$", frontmatter, flags=re.MULTILINE):
+                    frontmatter = re.sub(r"^model:\s*.*$", f"model: {target_model}", frontmatter, flags=re.MULTILINE)
+                else:
+                    frontmatter = frontmatter.rstrip() + f"\nmodel: {target_model}\n"
+                agent_md.write_text(f"---{frontmatter}---{body}", encoding="utf-8")
+                modifies += 1
+
+    # 2. Adaptation du prompt de délégation dans l'agent orchestrateur
+    orch_map = {"code": "code-orchestrateur", "hw": "hw-orchestrateur", "meca": "meca-orchestrateur"}
+    orchestrateur_nom = orch_map.get(famille, f"{famille}-orchestrateur")
+    orch_file = dossier_agents / orchestrateur_nom / "agent.md"
+    if orch_file.is_file():
+        texte_orch = orch_file.read_text(encoding="utf-8")
+        noms_actifs_str = ", ".join(f"`{a}`" for a in sorted(presents) if a != orchestrateur_nom)
+        texte_orch = re.sub(
+            r"Les noms\s+valides sont STRICTEMENT\s*:[^\n]+",
+            f"Les noms valides sont STRICTEMENT : {noms_actifs_str}.",
+            texte_orch
+        )
+
+        if outil == "claude_code":
+            bloc_delegation = "### Modèles assignés aux sous-agents\n\n"
+            bloc_delegation += "Les sous-agents du projet sont configurés avec les modèles Claude suivants :\n"
+            for ag in sorted(presents):
+                if ag == orchestrateur_nom:
+                    continue
+                m = mapping_complet.get(ag, "inherit")
+                bloc_delegation += f"- `{ag}` : `model: {m}`\n"
+            bloc_delegation += "\n"
+        else:
+            bloc_delegation = "### Modèles d'invocation assignés (invoke_subagent)\n\n"
+            bloc_delegation += "Lors de la délégation avec `invoke_subagent`, spécifie OBLIGATOIREMENT le paramètre `Model` suivant selon le sous-agent actif :\n"
+            for ag in sorted(presents):
+                if ag == orchestrateur_nom:
+                    continue
+                m = mapping_complet.get(ag, "inherit")
+                bloc_delegation += f"- `{ag}` : `Model=\"{m}\"`\n"
+            bloc_delegation += "\n"
+
+        if "### Modèles" in texte_orch:
+            texte_orch = re.sub(r"### Modèles.*?(\n# |\Z)", bloc_delegation + r"\1", texte_orch, flags=re.DOTALL)
+        elif "# Délégation" in texte_orch:
+            texte_orch = texte_orch.replace("# Délégation", f"# Délégation\n\n{bloc_delegation}")
+
+        orch_file.write_text(texte_orch, encoding="utf-8")
+        rapport.ok(f"Prompt de `{orchestrateur_nom}` adapté aux {len(presents)} agent(s) actif(s).")
+
+    # 3. Injection du tableau récapitulatif dans AGENTS.md / CLAUDE.md
+    fichiers_doc = []
+    if outil == "claude_code":
+        fichiers_doc.append(racine / "CLAUDE.md")
+    else:
+        fichiers_doc.append(racine / "AGENTS.md")
+
+    tableau_md = "## Matrice des Modèles IA Déployés\n\n"
+    tableau_md += "| Agent | Rôle | Modèle LLM | Statut |\n"
+    tableau_md += "|---|---|---|---|\n"
+    for ag_name in sorted(presents):
+        m = mapping_complet.get(ag_name, "inherit")
+        desc = DESCRIPTIONS_AGENTS.get(ag_name, ag_name)
+        tableau_md += f"| `{ag_name}` | {desc} | **`{m}`** | Actif |\n"
+    tableau_md += "\n"
+
+    for fdoc in fichiers_doc:
+        if not fdoc.is_file():
+            continue
+        tdoc = fdoc.read_text(encoding="utf-8")
+        if "## Matrice des Modèles IA Déployés" in tdoc:
+            tdoc = re.sub(r"## Matrice des Modèles IA Déployés.*?(\n## |\Z)", tableau_md + r"\1", tdoc, flags=re.DOTALL)
+        else:
+            tdoc = tdoc.rstrip() + "\n\n" + tableau_md
+        fdoc.write_text(tdoc, encoding="utf-8")
+        rapport.ok(f"Matrice des agents actifs documentée dans {fdoc.name}.")
+
+    # 4. Enregistrement dans .agents/cache/models.json ou .claude/cache/models.json
+    cache_dir = racine_agents / "cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    fichier_json = cache_dir / "models.json"
+    data = {
+        "preset": preset,
+        "active_agents": sorted(list(presents)),
+        "models": mapping_complet,
+        "updated_at": datetime.now().isoformat(),
+        "tool": outil,
+    }
+    fichier_json.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    rapport.ok(f"{modifies} agent(s) configurés avec succès (cache: {fichier_json.name}).")
+
+    return rapport
+
+
+def synchroniser_agents_projet(racine: Path, famille: str = "code", target_tool: str = "antigravity",
+                               agents_actifs: list[str] | set[str] | None = None,
+                               modeles: dict[str, str] | None = None,
+                               preset: str = "equilibre",
+                               kit_source: Path | str | None = None,
+                               rapport: Rapport | None = None) -> Rapport:
+    """Synchronise l'arborescence des agents du projet :
+    - Copie les agents activés depuis le kit de référence s'ils sont absents.
+    - Supprime du projet les agents désactivés.
+    - Applique les modèles LLM configurés et met à jour le prompt de l'orchestrateur et AGENTS.md / CLAUDE.md.
+    """
+    if rapport is None:
+        rapport = Rapport()
+
+    outil = normaliser_outil(target_tool)
+    dossier_nom = OUTILS_CIBLES[outil]["dossier_agents"]
+    racine_agents = racine / dossier_nom
+    if not racine_agents.is_dir():
+        racine_agents = racine / ".agents" if (racine / ".agents").is_dir() else (racine / ".claude")
+
+    dossier_agents = racine_agents / "agents"
+    dossier_agents.mkdir(parents=True, exist_ok=True)
+
+    # Récupération du kit source
+    kit = Path(kit_source).resolve() if kit_source else kit_par_defaut(target_tool=outil)
+    source_agents_dir = None
+    if kit and est_un_kit(kit, target_tool=outil):
+        source_sub = kit / dossier_nom / "agents"
+        if not source_sub.is_dir():
+            source_sub = kit / ".agents" / "agents" if (kit / ".agents" / "agents").is_dir() else (kit / ".claude" / "agents")
+        if source_sub.is_dir():
+            source_agents_dir = source_sub
+
+    # Si aucun agents_actifs n'est passé, on prend la liste complète de la famille
+    if agents_actifs is None:
+        agents_actifs_set = set(liste_agents_famille(famille))
+    else:
+        agents_actifs_set = set(agents_actifs)
+
+    # L'orchestrateur du mode est TOUJOURS obligatoire
+    orch_map = {"code": "code-orchestrateur", "hw": "hw-orchestrateur", "meca": "meca-orchestrateur"}
+    orchestrateur_nom = orch_map.get(famille, f"{famille}-orchestrateur")
+    agents_actifs_set.add(orchestrateur_nom)
+
+    # 1. Ajout / Restauration des agents activés depuis le kit source
+    ajoutes = 0
+    if source_agents_dir:
+        for ag in sorted(agents_actifs_set):
+            cible_agent = dossier_agents / ag
+            if not cible_agent.is_dir():
+                src_agent = source_agents_dir / ag
+                if src_agent.is_dir():
+                    shutil.copytree(src_agent, cible_agent)
+                    ajoutes += 1
+                    rapport.ok(f"Agent `{ag}` activé et installé depuis le kit.")
+
+    # 2. Suppression des agents désactivés (sauf orchestrateur)
+    retires = 0
+    for ag_dir in list(dossier_agents.iterdir()):
+        if not ag_dir.is_dir():
+            continue
+        if ag_dir.name not in agents_actifs_set and ag_dir.name != orchestrateur_nom:
+            try:
+                shutil.rmtree(ag_dir)
+                retires += 1
+                rapport.ok(f"Agent `{ag_dir.name}` désactivé et retiré du projet.")
+            except Exception as e:
+                rapport.alerte(f"Impossible de retirer l'agent {ag_dir.name} : {e}")
+
+    # 3. Application des modèles, prompt de l'orchestrateur et AGENTS.md / CLAUDE.md
+    appliquer_modeles_agents(racine, famille=famille, target_tool=outil, modeles=modeles,
+                             preset=preset, agents_actifs=agents_actifs_set, rapport=rapport)
+
+    rapport.ok(f"Synchronisation terminée : {len(agents_actifs_set)} agents actifs ({ajoutes} installés, {retires} retirés).")
+    return rapport
+
+
+def charger_modeles_projet(racine: Path, target_tool: str = "antigravity") -> dict:
+    """Charge la configuration des modèles et agents actifs enregistrée dans le projet."""
+    outil = normaliser_outil(target_tool)
+    dossier_nom = OUTILS_CIBLES[outil]["dossier_agents"]
+    preset_defaut = PRESETS_MODELES_PAR_OUTIL.get(outil, PRESETS_MODELES_PAR_OUTIL["antigravity"])["equilibre"]
+
+    for d in [racine / dossier_nom / "cache" / "models.json",
+              racine / ".agents" / "cache" / "models.json",
+              racine / ".claude" / "cache" / "models.json"]:
+        if d.is_file():
+            try:
+                data = json.loads(d.read_text(encoding="utf-8"))
+                return data
+            except Exception:
+                pass
+    return {"preset": "equilibre", "models": preset_defaut["mapping"], "active_agents": None}
+
+
+# --------------------------------------------------------------------------
 # Point d'entrée Principal
 # --------------------------------------------------------------------------
 
 
 def preparer_projet(project_root, app_mode, target_tool: str = "antigravity",
-                    kit_source=None, env_kicad=None, elaguer=True):
+                    kit_source=None, env_kicad=None, elaguer=True,
+                    modeles: dict[str, str] | None = None,
+                    preset_modeles: str = "equilibre",
+                    agents_actifs: list[str] | set[str] | None = None):
     """Installe et adapte le kit d'agents dans `project_root` pour l'outil choisi.
 
     target_tool : "antigravity" (par défaut) ou "claude_code".
@@ -764,6 +1211,10 @@ def preparer_projet(project_root, app_mode, target_tool: str = "antigravity",
         _nettoyer_table_commandes(racine, outil, rapport)
         _marquer_mode(racine, famille, outil, rapport)
         _creer_dossiers(racine, famille, outil, rapport)
+        synchroniser_agents_projet(racine, famille=famille, target_tool=outil,
+                                   agents_actifs=agents_actifs, modeles=modeles,
+                                   preset=preset_modeles, kit_source=kit,
+                                   rapport=rapport)
         _gitignore(racine, famille, rapport)
         _adapter_hooks(racine, outil, rapport)
         _ecrire_env(racine, env_kicad or {}, famille, outil, rapport, bloquant=False)

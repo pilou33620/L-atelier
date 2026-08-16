@@ -13,11 +13,25 @@ Au lancement, une boîte de dialogue s'ouvre pour vous permettre de :
 2. **Choisir l'Outil IA Cible** :
    - **Antigravity (Gemini)** : Installe le dossier `.agents/` et le contrat `AGENTS.md`.
    - **Claude Code (Claude)** : Installe le dossier `.claude/`, le contrat `CLAUDE.md`, `AGENTS.md` et les commandes slash (`.claude/commands/`).
-3. **Préparation automatique (Scaffolding)** :
-   Une case à cocher permet d'installer ou de mettre à jour le kit d'agents adapté dans votre projet. L'Atelier élague automatiquement les familles d'agents inutiles, prépare les dossiers (`.agent_reports/`, `data_sheets/`, etc.), écrit le cache d'environnement et configure les garde-fous.
+3. **Profil de Modèles IA (LLMs)** :
+   - Selon l'outil choisi (**Antigravity** ou **Claude Code**), L'Atelier adapte automatiquement les modèles proposés :
+     - **Antigravity (Gemini)** : *Gemini Pro*, *Gemini Flash*, *Gemini Flash-Lite*, *Hérité*.
+     - **Claude Code (Claude)** : *Claude 3.5 Sonnet*, *Claude 3.5 Haiku*, *Claude 3 Opus*, *Hérité*.
+   - Sélectionnez un profil prédéfini (*⚖️ Équilibré : Orchestrateur Rapide (Flash/Haiku) + Architecte/Codeur Puissant (Pro/Sonnet) + Reviewer Rapide*, *⚡ Rapide*, *🧠 Haute Précision*, *🔄 Hérité*).
+   - Ou cliquez sur **⚙️ Personnaliser…** pour activer/désactiver des agents et assigner individuellement le modèle LLM de chaque agent du projet.
+4. **Préparation & Synchronisation automatique (Scaffolding)** :
+   Une case à cocher permet d'installer ou de mettre à jour le kit d'agents adapté dans votre projet. L'Atelier élague automatiquement les familles d'agents inutiles, applique les modèles configurés dans chaque `agent.md`, met à jour les règles de délégation de l'orchestrateur et documente la matrice dans `AGENTS.md` (Antigravity) ou `CLAUDE.md` (Claude Code).
+5. **Ouverture automatique de l'outil IA** :
+   Une case à cocher permet de lancer automatiquement Antigravity (ou un terminal Claude Code) sur le dossier du projet dès la fin de l'initialisation.
 
 ## 2. Interface Principale
 L'interface de L'Atelier est divisée en plusieurs panneaux :
+- **Barre d'outils supérieure** :
+  - **📂 Ouvrir un dossier** : Pour basculer rapidement d'un projet à l'autre.
+  - **🚀 Lancer Antigravity / Claude Code** : Ouvre directement le dossier du projet dans votre outil IA (IDE Antigravity ou session Claude Code).
+  - **🐙 Aide GitHub** : Aide-mémoire interactif pour les flux Git.
+  - **🔧 Réenregistrer l'env. agents** : Resynchronise les chemins d'environnement et index KiCad.
+  - **🤖 Modèles IA** : Permet de reconfigurer et réappliquer à chaud les modèles LLM des agents sans recréer le projet.
 - **Panneau de gauche (Onglets)** :
   - **Fichiers** : Explorateur de fichiers du projet (pour naviguer, renommer, supprimer).
   - **Éditeur** : Éditeur de texte intégré avec coloration syntaxique pour le Python.

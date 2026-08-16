@@ -28,8 +28,9 @@ if __name__ == "__main__":
         app_mode = selection[0]
         target_directory = selection[1]
         target_tool = selection[2] if len(selection) > 2 else "antigravity"
+        auto_open = selection[3] if len(selection) > 3 else False
         
-        logger.info(f"[LOG - SYSTEM] Mode: '{app_mode}', Cible IA: '{target_tool}'")
+        logger.info(f"[LOG - SYSTEM] Mode: '{app_mode}', Cible IA: '{target_tool}', Auto-Open: {auto_open}")
         window = MainWindow(app_mode=app_mode, target_tool=target_tool)
         window.show()
 
@@ -38,6 +39,8 @@ if __name__ == "__main__":
             # hardware. L'appel supplémentaire à import_datasheets() qui se
             # trouvait ici ouvrait une SECONDE fois le sélecteur de fichiers.
             window.open_folder(path=target_directory)
+            if auto_open:
+                window.lancer_outil_ia_projet(silencieux_si_succes=True)
 
         app.exec()
 

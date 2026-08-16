@@ -31,7 +31,12 @@ except ImportError:
 try:
     from scaffold_projet import (preparer_projet, mettre_a_jour_env,
                                  kit_par_defaut, emplacements_kit, est_un_kit,
-                                 OUTILS_CIBLES)
+                                 OUTILS_CIBLES, MODELES_DISPONIBLES, MODELES_DISPONIBLES_PAR_OUTIL,
+                                 DESCRIPTIONS_AGENTS, PRESETS_MODELES, PRESETS_MODELES_PAR_OUTIL,
+                                 PRESET_EQUILIBRE, appliquer_modeles_agents, synchroniser_agents_projet,
+                                 charger_modeles_projet, liste_agents_famille,
+                                 obtenir_mapping_effectif, obtenir_modeles_disponibles,
+                                 obtenir_presets_modele, FAMILLES)
     SCAFFOLD_AVAILABLE = True
 except ImportError:
     SCAFFOLD_AVAILABLE = False
@@ -39,6 +44,19 @@ except ImportError:
         "antigravity": {"nom": "Antigravity (Gemini)", "dossier_agents": ".agents"},
         "claude_code": {"nom": "Claude Code (Claude)", "dossier_agents": ".claude"},
     }
+    MODELES_DISPONIBLES_PAR_OUTIL = {
+        "antigravity": [("inherit", "Hérité"), ("flash", "Gemini Flash"), ("pro", "Gemini Pro")],
+        "claude_code": [("inherit", "Hérité"), ("haiku", "Claude Haiku"), ("sonnet", "Claude Sonnet"), ("opus", "Claude Opus")],
+    }
+    MODELES_DISPONIBLES = MODELES_DISPONIBLES_PAR_OUTIL["antigravity"]
+    DESCRIPTIONS_AGENTS = {}
+    PRESETS_MODELES_PAR_OUTIL = {
+        "antigravity": {"equilibre": {"nom": "Équilibré", "mapping": {}}},
+        "claude_code": {"equilibre": {"nom": "Équilibré", "mapping": {}}},
+    }
+    PRESETS_MODELES = PRESETS_MODELES_PAR_OUTIL["antigravity"]
+    PRESET_EQUILIBRE = {}
+    FAMILLES = {"coder": "code", "hardware": "hw", "meca": "meca"}
 
     def kit_par_defaut(target_tool="antigravity"):
         return None
@@ -48,6 +66,27 @@ except ImportError:
 
     def est_un_kit(_, target_tool="antigravity"):
         return False
+
+    def appliquer_modeles_agents(*args, **kwargs):
+        return None
+
+    def synchroniser_agents_projet(*args, **kwargs):
+        return None
+
+    def charger_modeles_projet(*args, **kwargs):
+        return {"preset": "equilibre", "models": {}, "active_agents": None}
+
+    def liste_agents_famille(famille):
+        return []
+
+    def obtenir_mapping_effectif(preset="equilibre", surcharges=None, target_tool="antigravity"):
+        return {}
+
+    def obtenir_modeles_disponibles(target_tool="antigravity"):
+        return MODELES_DISPONIBLES_PAR_OUTIL.get(target_tool, MODELES_DISPONIBLES)
+
+    def obtenir_presets_modele(target_tool="antigravity"):
+        return PRESETS_MODELES_PAR_OUTIL.get(target_tool, PRESETS_MODELES)
 
 # Client pcbparts.dev : recherche, tarifs, modèles KiCad. Les appels réseau se
 # font ICI et déposent des fichiers dans le projet ; les agents ne sortent
@@ -69,6 +108,78 @@ def hardened_subprocess_env(base_env=None):
     env = dict(base_env if base_env is not None else os.environ)
     env["NoDefaultCurrentDirectoryInExePath"] = "1"
     return env
+
+def trouver_antigravity_executable(custom_path: str = "") -> str | None:
+    """Recherche l'exécutable Antigravity sur le système (PATH ou chemins standards)."""
+    if custom_path and os.path.isfile(custom_path):
+        return custom_path
+
+    # 1. Vérification dans le PATH
+    for cmd in ("antigravity", "agy"):
+        p = shutil.which(cmd)
+        if p and os.path.isfile(p):
+            return p
+
+    # 2. Chemins standards d'installation sous Windows
+    local_appdata = os.environ.get("LOCALAPPDATA", "")
+    program_files = os.environ.get("ProgramFiles", "")
+    program_files_x86 = os.environ.get("ProgramFiles(x86)", "")
+    candidats = [
+        os.path.join(local_appdata, "Programs", "antigravity", "Antigravity.exe"),
+        os.path.join(local_appdata, "Programs", "Antigravity", "Antigravity.exe"),
+        os.path.join(program_files, "Antigravity", "Antigravity.exe"),
+        os.path.join(program_files_x86, "Antigravity", "Antigravity.exe"),
+    ]
+    for c in candidats:
+        if c and os.path.isfile(c):
+            return c
+
+    # 3. macOS / Linux
+    candidats_unix = [
+        "/Applications/Antigravity.app/Contents/MacOS/Antigravity",
+        "/usr/local/bin/antigravity",
+        "/usr/bin/antigravity",
+    ]
+    for c in candidats_unix:
+        if os.path.isfile(c):
+            return c
+
+    return None
+
+def lancer_outil_ia(dossier_projet: str, target_tool: str = "antigravity", custom_path: str = "") -> tuple[bool, str]:
+    """Lance l'outil IA (Antigravity ou Claude Code) avec le dossier projet comme espace de travail."""
+    if not dossier_projet or not os.path.isdir(dossier_projet):
+        return False, "Le dossier du projet n'existe pas ou n'est pas accessible."
+
+    dossier_abs = os.path.abspath(dossier_projet)
+
+    if target_tool == "claude_code":
+        claude_bin = shutil.which("claude")
+        try:
+            if os.name == "nt":
+                wt_bin = shutil.which("wt.exe")
+                if wt_bin:
+                    subprocess.Popen(
+                        [wt_bin, "-d", dossier_abs, "powershell", "-NoExit", "-Command", "claude" if claude_bin else "Write-Host 'Claude CLI introuvable sur le PATH'"],
+                        env=hardened_subprocess_env()
+                    )
+                else:
+                    cmd = f'start powershell -NoExit -Command "Set-Location \'{dossier_abs}\'; if (Get-Command claude -ErrorAction SilentlyContinue) {{ claude }} else {{ Write-Host \'Claude CLI introuvable sur le PATH\' }}"'
+                    subprocess.Popen(cmd, shell=True, env=hardened_subprocess_env())
+            else:
+                subprocess.Popen(["claude"], cwd=dossier_abs, env=hardened_subprocess_env())
+            return True, "Claude Code démarré dans un nouveau terminal."
+        except Exception as e:
+            return False, f"Impossible de lancer le terminal pour Claude Code : {e}"
+    else:
+        exe = trouver_antigravity_executable(custom_path)
+        if not exe:
+            return False, "Exécutable Antigravity.exe introuvable sur le système."
+        try:
+            subprocess.Popen([exe, dossier_abs], env=hardened_subprocess_env())
+            return True, f"Antigravity lancé avec succès sur '{dossier_abs}'."
+        except Exception as e:
+            return False, f"Erreur lors du lancement d'Antigravity : {e}"
 
 class FileSandbox:
     _file_lock = threading.Lock()
@@ -555,24 +666,284 @@ class PythonHighlighter(QSyntaxHighlighter):
             for m in pattern.finditer(text):
                 self.setFormat(m.start(), m.end() - m.start(), fmt)
 
+class AgentModelsConfigDialog(QDialog):
+    """Dialogue de configuration fine des modèles LLM et de l'activation/désactivation de chaque agent."""
+    def __init__(self, parent=None, app_mode="coder", target_tool="antigravity",
+                 preset_initial="equilibre", custom_models=None, active_agents=None, project_root=""):
+        super().__init__(parent)
+        self.target_tool = target_tool
+        is_claude = (self.target_tool == "claude_code")
+        titre_outil = "Claude Code (Claude)" if is_claude else "Antigravity (Gemini)"
+        self.setWindowTitle(f"Configuration des Agents & Modèles IA — {titre_outil}")
+        self.resize(880, 630)
+        self.setModal(True)
+        self.app_mode = app_mode
+        self.project_root = project_root
+        self.famille = FAMILLES.get(app_mode, "code")
+        self.custom_models = dict(custom_models or {})
+        
+        presets = obtenir_presets_modele(self.target_tool)
+        self.selected_preset = preset_initial if preset_initial in presets else "equilibre"
+
+        # Initialisation des agents actifs
+        tous_agents = liste_agents_famille(self.famille)
+        if active_agents is not None:
+            self.active_agents = set(active_agents)
+        elif self.project_root:
+            # Si un projet existe déjà, on vérifie quels dossiers d'agents sont réellement présents
+            outil_nom = OUTILS_CIBLES.get(self.target_tool, {}).get("dossier_agents", ".agents")
+            dossier_ag = Path(self.project_root) / outil_nom / "agents"
+            if not dossier_ag.is_dir():
+                dossier_ag = Path(self.project_root) / ".agents" / "agents"
+            if dossier_ag.is_dir():
+                self.active_agents = {d.name for d in dossier_ag.iterdir() if d.is_dir()}
+            else:
+                self.active_agents = set(tous_agents)
+        else:
+            self.active_agents = set(tous_agents)
+
+        # L'orchestrateur est toujours obligatoire
+        orch_map = {"code": "code-orchestrateur", "hw": "hw-orchestrateur", "meca": "meca-orchestrateur"}
+        self.orchestrateur_nom = orch_map.get(self.famille, f"{self.famille}-orchestrateur")
+        self.active_agents.add(self.orchestrateur_nom)
+
+        self._build_ui()
+        self._load_values()
+
+    def _build_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setSpacing(10)
+
+        is_claude = (self.target_tool == "claude_code")
+        nom_llms = "Claude 3.5 Sonnet, Haiku, Opus ou Hérité" if is_claude else "Gemini Flash, Pro, Lite ou Hérité"
+
+        # En-tête
+        header = QLabel(
+            f"<b>Gestion des Agents & Modèles IA ({'Claude Code' if is_claude else 'Antigravity'})</b><br>"
+            f"<span style='color: #888;'>Activez ou désactivez les agents selon vos besoins et assignez à chacun son modèle LLM "
+            f"({nom_llms}).</span>"
+        )
+        header.setWordWrap(True)
+        layout.addWidget(header)
+
+        # Barre d'actions & Presets
+        grp_preset = QGroupBox("Profils rapides & Sélections")
+        preset_layout = QHBoxLayout(grp_preset)
+        preset_layout.setSpacing(8)
+
+        self.combo_preset = QComboBox()
+        presets = obtenir_presets_modele(self.target_tool)
+        for p_id, p_info in presets.items():
+            self.combo_preset.addItem(p_info["nom"], p_id)
+
+        idx = self.combo_preset.findData(self.selected_preset)
+        if idx >= 0:
+            self.combo_preset.setCurrentIndex(idx)
+        self.combo_preset.currentIndexChanged.connect(self._on_preset_changed)
+
+        preset_layout.addWidget(QLabel("Profil LLM :"))
+        preset_layout.addWidget(self.combo_preset, 1)
+
+        self.btn_all = QPushButton("✅ Tout Activer")
+        self.btn_all.setToolTip("Active tous les agents disponibles pour ce mode")
+        self.btn_all.clicked.connect(self._select_all_agents)
+        preset_layout.addWidget(self.btn_all)
+
+        self.btn_essential = QPushButton("⭐ Sélection Essentielle")
+        self.btn_essential.setToolTip("Active uniquement l'Orchestrateur, l'Architecte, le Codeur, le Reviewer et la Passerelle Specs")
+        self.btn_essential.clicked.connect(self._select_essential_agents)
+        preset_layout.addWidget(self.btn_essential)
+
+        self.btn_reset = QPushButton("🔄 Rétablir")
+        self.btn_reset.setToolTip("Rétablit la sélection recommandée par défaut")
+        self.btn_reset.clicked.connect(self._reset_to_recommended)
+        preset_layout.addWidget(self.btn_reset)
+        layout.addWidget(grp_preset)
+
+        # Table des agents
+        self.table = QTableWidget()
+        self.table.setColumnCount(4)
+        self.table.setHorizontalHeaderLabels(["Actif", "Nom de l'Agent", "Rôle & Description", "Modèle LLM assigné"])
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        self.table.verticalHeader().setVisible(False)
+        self.table.setAlternatingRowColors(True)
+        layout.addWidget(self.table, 1)
+
+        # Conseils d'optimisation
+        info_box = QFrame()
+        info_box.setObjectName("Muted")
+        info_layout = QVBoxLayout(info_box)
+        info_layout.setContentsMargins(8, 6, 8, 6)
+        if is_claude:
+            info_lbl = QLabel(
+                "💡 <b>Conseils d'architecture multi-modèles (Claude Code) :</b><br>"
+                "• <b>Claude 3.5 Haiku</b> : Ultra-rapide & économique pour l'Orchestrateur (aiguillage), le Reviewer et la Passerelle Specs.<br>"
+                "• <b>Claude 3.5 Sonnet</b> : Puissance maximale de raisonnement pour l'Architecte (specs) et le Codeur (génération fiable).<br>"
+                "• <b>Claude 3 Opus</b> : Raisonnement lourd et réflexion approfondie pour les tâches hautement complexes."
+            )
+        else:
+            info_lbl = QLabel(
+                "💡 <b>Conseils d'architecture multi-modèles (Antigravity / Gemini) :</b><br>"
+                "• <b>Gemini Flash</b> : Ultra-rapide & économique pour l'Orchestrateur (aiguillage), le Reviewer et la Passerelle Specs.<br>"
+                "• <b>Gemini Pro</b> : Puissance maximale de raisonnement pour l'Architecte (specs) et le Codeur (génération fiable)."
+            )
+        info_lbl.setWordWrap(True)
+        info_layout.addWidget(info_lbl)
+        layout.addWidget(info_box)
+
+        # Boutons d'action
+        btn_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        btn_box.button(QDialogButtonBox.StandardButton.Ok).setText("💾 Synchroniser le dossier agents & Enregistrer")
+        btn_box.button(QDialogButtonBox.StandardButton.Cancel).setText("Annuler")
+        btn_box.accepted.connect(self.accept)
+        btn_box.rejected.connect(self.reject)
+        layout.addWidget(btn_box)
+
+        self.checkboxes_agents = {}
+        self.combos_agents = {}
+
+    def _load_values(self):
+        agents = liste_agents_famille(self.famille)
+        mapping = obtenir_mapping_effectif(self.selected_preset, self.custom_models, target_tool=self.target_tool)
+        modeles_dispo = obtenir_modeles_disponibles(self.target_tool)
+
+        self.table.setRowCount(len(agents))
+        self.checkboxes_agents.clear()
+        self.combos_agents.clear()
+
+        for row, agent_name in enumerate(agents):
+            # 0. Checkbox Actif
+            chk = QCheckBox()
+            is_active = (agent_name in self.active_agents)
+            chk.setChecked(is_active)
+            if agent_name == self.orchestrateur_nom:
+                chk.setChecked(True)
+                chk.setEnabled(False)
+                chk.setToolTip("Agent principal obligatoire pour l'orchestration du mode")
+            else:
+                chk.setToolTip("Activer ou désactiver cet agent dans le projet")
+                chk.toggled.connect(lambda checked, ag=agent_name: self._on_agent_toggled(ag, checked))
+
+            chk_widget = QWidget()
+            chk_layout = QHBoxLayout(chk_widget)
+            chk_layout.addWidget(chk)
+            chk_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            chk_layout.setContentsMargins(4, 2, 4, 2)
+            self.table.setCellWidget(row, 0, chk_widget)
+            self.checkboxes_agents[agent_name] = chk
+
+            # 1. Nom de l'agent
+            item_name = QTableWidgetItem(agent_name)
+            item_name.setFlags(item_name.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            font = item_name.font()
+            font.setBold(True)
+            item_name.setFont(font)
+            self.table.setItem(row, 1, item_name)
+
+            # 2. Description
+            desc = DESCRIPTIONS_AGENTS.get(agent_name, agent_name)
+            item_desc = QTableWidgetItem(desc)
+            item_desc.setFlags(item_desc.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            self.table.setItem(row, 2, item_desc)
+
+            # 3. QComboBox Modèle
+            combo = QComboBox()
+            for m_id, m_label in modeles_dispo:
+                combo.addItem(m_label, m_id)
+
+            current_model = mapping.get(agent_name, "inherit")
+            idx = combo.findData(current_model)
+            if idx >= 0:
+                combo.setCurrentIndex(idx)
+
+            combo.currentIndexChanged.connect(lambda _, ag=agent_name, cb=combo: self._on_agent_model_changed(ag, cb))
+            self.combos_agents[agent_name] = combo
+            self.table.setCellWidget(row, 3, combo)
+
+    def _on_agent_toggled(self, agent_name, is_checked):
+        if is_checked:
+            self.active_agents.add(agent_name)
+        else:
+            self.active_agents.discard(agent_name)
+
+    def _select_all_agents(self):
+        for ag, chk in self.checkboxes_agents.items():
+            chk.setChecked(True)
+
+    def _select_essential_agents(self):
+        prefix = self.famille + "-"
+        essentiels = {
+            self.orchestrateur_nom,
+            f"{prefix}architect",
+            f"{prefix}coder",
+            f"{prefix}coder-skidl",
+            f"{prefix}designer",
+            f"{prefix}reviewer",
+            f"{prefix}lead",
+            "spec-translator",
+        }
+        for ag, chk in self.checkboxes_agents.items():
+            if ag == self.orchestrateur_nom:
+                continue
+            chk.setChecked(ag in essentiels)
+
+    def _on_agent_model_changed(self, agent_name, combo):
+        self.custom_models[agent_name] = combo.currentData()
+
+    def _on_preset_changed(self, index):
+        p_id = self.combo_preset.itemData(index)
+        self.selected_preset = p_id
+        presets = obtenir_presets_modele(self.target_tool)
+        mapping = presets.get(p_id, presets.get("equilibre", {}))["mapping"]
+        self.custom_models.update(mapping)
+        for ag, combo in self.combos_agents.items():
+            m = mapping.get(ag, "inherit")
+            idx = combo.findData(m)
+            if idx >= 0:
+                combo.blockSignals(True)
+                combo.setCurrentIndex(idx)
+                combo.blockSignals(False)
+
+    def _reset_to_recommended(self):
+        idx = self.combo_preset.findData("equilibre")
+        if idx >= 0:
+            self.combo_preset.setCurrentIndex(idx)
+        self._select_all_agents()
+
+    def get_configuration(self):
+        mapping = {}
+        for ag, cb in self.combos_agents.items():
+            mapping[ag] = cb.currentData()
+
+        actifs = []
+        for ag, chk in self.checkboxes_agents.items():
+            if chk.isChecked() or ag == self.orchestrateur_nom:
+                actifs.append(ag)
+        return self.selected_preset, mapping, sorted(actifs)
+
+
 class ProjectLauncherDialog(QDialog):
     """Fenêtre de dialogue pour choisir ou créer un projet et sélectionner l'outil IA."""
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Choix du Projet et Outil IA")
         self.setModal(True)
-        self.resize(420, 420)
-        
+        self.resize(480, 480)
+
         reglages = QSettings("Antigravity", "LAtelierIA")
         outil_memorise = reglages.value("target_tool", "antigravity", type=str)
+        preset_memorise = reglages.value("agent_model_preset", "equilibre", type=str)
 
         layout = QVBoxLayout(self)
-        layout.setSpacing(12)
+        layout.setSpacing(10)
 
-        # --- 1. Groupe Domaine et Action ---
+        # --- 1. Domaine et Action ---
         grp_mode = QGroupBox("1. Domaine & Action du projet")
         mode_layout = QVBoxLayout(grp_mode)
-        mode_layout.setSpacing(6)
+        mode_layout.setSpacing(4)
 
         self.mode_group = QButtonGroup(self)
         self.radio_new_coder = QRadioButton("Concevoir un nouveau projet code")
@@ -599,10 +970,10 @@ class ProjectLauncherDialog(QDialog):
             mode_layout.addWidget(radio)
         layout.addWidget(grp_mode)
 
-        # --- 2. Groupe Outil IA Cible ---
+        # --- 2. Outil IA Cible ---
         grp_tool = QGroupBox("2. Outil IA cible")
         tool_layout = QVBoxLayout(grp_tool)
-        tool_layout.setSpacing(6)
+        tool_layout.setSpacing(4)
 
         self.tool_group = QButtonGroup(self)
         self.radio_antigravity = QRadioButton("Antigravity (Gemini) — Dossier .agents/ & AGENTS.md")
@@ -618,11 +989,36 @@ class ProjectLauncherDialog(QDialog):
         else:
             self.radio_antigravity.setChecked(True)
 
+        self.radio_antigravity.toggled.connect(self._on_tool_selection_changed)
+        self.radio_claude_code.toggled.connect(self._on_tool_selection_changed)
+
         tool_layout.addWidget(self.radio_antigravity)
         tool_layout.addWidget(self.radio_claude_code)
         layout.addWidget(grp_tool)
 
-        # --- 3. Option Scaffolding ---
+        # --- 3. Profil des Modèles IA (LLMs) ---
+        grp_models = QGroupBox("3. Profil des Modèles IA (LLMs)")
+        models_layout = QHBoxLayout(grp_models)
+        models_layout.setSpacing(6)
+
+        self.combo_model_preset = QComboBox()
+        models_layout.addWidget(QLabel("Profil :"))
+        models_layout.addWidget(self.combo_model_preset, 1)
+
+        self.btn_config_models = QPushButton("⚙️ Personnaliser…")
+        self.btn_config_models.setToolTip("Activer/désactiver et ajuster les modèles individuellement pour chaque agent")
+        self.btn_config_models.clicked.connect(self._ouvrir_dialog_modeles)
+        models_layout.addWidget(self.btn_config_models)
+        layout.addWidget(grp_models)
+
+        # Initialisation de l'outil et des presets
+        self.selected_target_tool = "claude_code" if self.radio_claude_code.isChecked() else "antigravity"
+        self.selected_model_preset = preset_memorise
+        self.active_agents = None
+        self._refresh_presets_combo()
+        self.combo_model_preset.currentIndexChanged.connect(self._on_launcher_preset_changed)
+
+        # --- 4. Option Scaffolding ---
         self.chk_preparer = QCheckBox(
             "Installer / mettre à jour le kit d'agents dans le projet")
         self.chk_preparer.setChecked(True)
@@ -635,6 +1031,15 @@ class ProjectLauncherDialog(QDialog):
                 "Kit d'agents : module scaffold_projet.py introuvable")
         layout.addWidget(self.chk_preparer)
 
+        # --- 5. Option Ouverture Automatique ---
+        self.chk_auto_open = QCheckBox(
+            "Ouvrir automatiquement le projet dans l'outil IA après initialisation")
+        auto_open_pref = reglages.value("auto_open_tool", True, type=bool)
+        self.chk_auto_open.setChecked(auto_open_pref)
+        self.chk_auto_open.setToolTip(
+            "Lance immédiatement l'IDE Antigravity ou le terminal Claude Code sur le dossier projet.")
+        layout.addWidget(self.chk_auto_open)
+
         layout.addStretch()
 
         btn_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
@@ -644,8 +1049,66 @@ class ProjectLauncherDialog(QDialog):
         layout.addWidget(btn_box)
 
         self.selected_app_mode = "coder"
-        self.selected_target_tool = "antigravity"
         self.selected_path = ""
+
+    def _refresh_presets_combo(self):
+        presets = obtenir_presets_modele(self.selected_target_tool)
+        self.combo_model_preset.blockSignals(True)
+        self.combo_model_preset.clear()
+        for p_id, p_info in presets.items():
+            self.combo_model_preset.addItem(p_info["nom"], p_id)
+
+        if self.selected_model_preset not in presets:
+            self.selected_model_preset = "equilibre"
+        idx = self.combo_model_preset.findData(self.selected_model_preset)
+        if idx >= 0:
+            self.combo_model_preset.setCurrentIndex(idx)
+        self.combo_model_preset.blockSignals(False)
+        self.custom_models = dict(presets.get(self.selected_model_preset, presets["equilibre"])["mapping"])
+
+    def _on_tool_selection_changed(self):
+        tool = "claude_code" if self.radio_claude_code.isChecked() else "antigravity"
+        if tool != self.selected_target_tool:
+            self.selected_target_tool = tool
+            self._refresh_presets_combo()
+
+    def _get_current_app_mode(self):
+        choice = self.mode_group.checkedId()
+        if choice in self.CHOIX_NEUF:
+            return self.CHOIX_NEUF[choice]
+        if choice in self.CHOIX_EXISTANT:
+            return self.CHOIX_EXISTANT[choice]
+        return "coder"
+
+    def _on_launcher_preset_changed(self, index):
+        p_id = self.combo_model_preset.itemData(index)
+        if p_id:
+            self.selected_model_preset = p_id
+            presets = obtenir_presets_modele(self.selected_target_tool)
+            mapping = presets.get(p_id, presets.get("equilibre", {}))["mapping"]
+            self.custom_models = dict(mapping)
+
+    def _ouvrir_dialog_modeles(self):
+        app_mode = self._get_current_app_mode()
+        target_tool = "claude_code" if self.radio_claude_code.isChecked() else "antigravity"
+        dlg = AgentModelsConfigDialog(
+            self,
+            app_mode=app_mode,
+            target_tool=target_tool,
+            preset_initial=self.selected_model_preset,
+            custom_models=self.custom_models,
+            active_agents=self.active_agents,
+        )
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            preset, mapping, active_agents = dlg.get_configuration()
+            self.selected_model_preset = preset
+            self.custom_models = mapping
+            self.active_agents = active_agents
+            idx = self.combo_model_preset.findData(preset)
+            if idx >= 0:
+                self.combo_model_preset.blockSignals(True)
+                self.combo_model_preset.setCurrentIndex(idx)
+                self.combo_model_preset.blockSignals(False)
 
     def accept(self):
         choice = self.mode_group.checkedId()
@@ -653,6 +1116,8 @@ class ProjectLauncherDialog(QDialog):
 
         reglages = QSettings("Antigravity", "LAtelierIA")
         reglages.setValue("target_tool", self.selected_target_tool)
+        reglages.setValue("agent_model_preset", self.selected_model_preset)
+        reglages.setValue("auto_open_tool", self.chk_auto_open.isChecked())
 
         if choice in self.CHOIX_NEUF:
             parent_dir = QFileDialog.getExistingDirectory(self, "Sélectionnez le dossier parent")
@@ -723,7 +1188,10 @@ class ProjectLauncherDialog(QDialog):
 
         rapport = preparer_projet(self.selected_path, self.selected_app_mode,
                                   target_tool=tool,
-                                  kit_source=kit)
+                                  kit_source=kit,
+                                  modeles=self.custom_models,
+                                  preset_modeles=self.selected_model_preset,
+                                  agents_actifs=self.active_agents)
         texte = "\n".join(rapport.lignes) or "Rien à faire."
         if rapport.succes:
             QMessageBox.information(self, f"Projet préparé pour {nom_outil}", texte)
@@ -737,7 +1205,7 @@ class ProjectLauncherDialog(QDialog):
         return reponse == QMessageBox.StandardButton.Yes
 
     def get_selection(self):
-        return self.selected_app_mode, self.selected_path, self.selected_target_tool
+        return self.selected_app_mode, self.selected_path, self.selected_target_tool, self.chk_auto_open.isChecked()
 
 
 
@@ -1019,6 +1487,13 @@ git push -u origin main</pre>"""
         self.open_btn.clicked.connect(lambda: self.open_folder())
         h.addWidget(self.open_btn)
 
+        nom_outil = "Claude Code" if self.target_tool == "claude_code" else "Antigravity"
+        self.launch_tool_btn = QPushButton(f"🚀 Lancer {nom_outil}")
+        self.launch_tool_btn.setObjectName("Accent")
+        self.launch_tool_btn.setToolTip(f"Ouvrir directement ce projet dans {nom_outil}")
+        self.launch_tool_btn.clicked.connect(lambda: self.lancer_outil_ia_projet())
+        h.addWidget(self.launch_tool_btn)
+
         h.addWidget(self._vsep())
 
         self.git_btn = QPushButton("🐙 Aide GitHub")
@@ -1033,6 +1508,13 @@ git push -u origin main</pre>"""
         self.env_btn.clicked.connect(self.resynchroniser_env_agents)
         self.env_btn.setEnabled(SCAFFOLD_AVAILABLE)
         h.addWidget(self.env_btn)
+
+        self.models_btn = QPushButton("🤖 Modèles IA")
+        self.models_btn.setToolTip(
+            "Configurer les modèles LLM (Gemini Flash, Pro, Lite, Hérité) pour chaque agent du projet.")
+        self.models_btn.clicked.connect(self.configurer_modeles_agents)
+        self.models_btn.setEnabled(SCAFFOLD_AVAILABLE)
+        h.addWidget(self.models_btn)
 
         h.addStretch()
         return bar
@@ -1224,6 +1706,92 @@ git push -u origin main</pre>"""
         else:
             QMessageBox.warning(self, "Environnement agents",
                                 "\n".join(rapport.lignes))
+
+    def configurer_modeles_agents(self):
+        """Ouvre le dialogue de configuration des modèles LLM et les applique directement au projet actif."""
+        if not SCAFFOLD_AVAILABLE:
+            QMessageBox.warning(self, "Indisponible", "Le module scaffold_projet.py est introuvable.")
+            return
+        if not self.project_root:
+            QMessageBox.warning(self, "Aucun projet ouvert", "Veuillez d'abord ouvrir un dossier projet.")
+            return
+
+        racine = Path(self.project_root)
+        config_actuelle = charger_modeles_projet(racine, self.target_tool)
+        preset_actuel = config_actuelle.get("preset", "equilibre")
+        modeles_actuels = config_actuelle.get("models", {})
+        agents_actifs_actuels = config_actuelle.get("active_agents", None)
+
+        dlg = AgentModelsConfigDialog(
+            self,
+            app_mode=self.app_mode,
+            target_tool=self.target_tool,
+            preset_initial=preset_actuel,
+            custom_models=modeles_actuels,
+            active_agents=agents_actifs_actuels,
+            project_root=str(racine)
+        )
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            preset_choisi, modeles_choisis, agents_actifs_choisis = dlg.get_configuration()
+            famille = FAMILLES.get(self.app_mode, "code")
+            rapport = synchroniser_agents_projet(
+                racine,
+                famille=famille,
+                target_tool=self.target_tool,
+                agents_actifs=agents_actifs_choisis,
+                modeles=modeles_choisis,
+                preset=preset_choisi
+            )
+            self.afficher_rapport_preparation(rapport)
+            texte = "\n".join(rapport.lignes) or "Dossier agents et modèles synchronisés avec succès."
+            if rapport.succes:
+                QMessageBox.information(self, "Agents & Modèles IA synchronisés", texte)
+            else:
+                QMessageBox.warning(self, "Synchronisation partielle des agents", texte)
+
+    def lancer_outil_ia_projet(self, silencieux_si_succes=False):
+        """Lance l'outil IA (Antigravity ou Claude Code) sur le dossier du projet actif."""
+        if not self.project_root or not os.path.isdir(self.project_root):
+            if not silencieux_si_succes:
+                QMessageBox.warning(self, "Aucun projet actif", "Veuillez d'abord ouvrir ou créer un dossier projet.")
+            return
+
+        nom_outil = "Claude Code" if self.target_tool == "claude_code" else "Antigravity"
+        custom_exe = self.settings.value(f"path_exe_{self.target_tool}", "", type=str)
+
+        succes, message = lancer_outil_ia(self.project_root, target_tool=self.target_tool, custom_path=custom_exe)
+
+        if not succes and self.target_tool == "antigravity":
+            # Demander à l'utilisateur de localiser Antigravity.exe
+            reponse = QMessageBox.question(
+                self, "Antigravity introuvable",
+                "L'exécutable d'Antigravity n'a pas été détecté automatiquement.\n\n"
+                "Souhaitez-vous indiquer l'emplacement de 'Antigravity.exe' manuellement ?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if reponse == QMessageBox.StandardButton.Yes:
+                file_path, _ = QFileDialog.getOpenFileName(
+                    self, "Localiser Antigravity.exe",
+                    os.environ.get("LOCALAPPDATA", ""),
+                    "Exécutables (*.exe);;Tous les fichiers (*.*)"
+                )
+                if file_path and os.path.isfile(file_path):
+                    self.settings.setValue("path_exe_antigravity", file_path)
+                    succes, message = lancer_outil_ia(self.project_root, target_tool="antigravity", custom_path=file_path)
+                    if succes:
+                        if self.statusBar():
+                            self.statusBar().showMessage(f"🚀 {nom_outil} démarré avec succès", 4000)
+                        return
+                    else:
+                        QMessageBox.critical(self, "Erreur", message)
+                        return
+
+        if succes:
+            if self.statusBar():
+                self.statusBar().showMessage(f"🚀 {nom_outil} démarré avec succès", 4000)
+        else:
+            if not silencieux_si_succes:
+                QMessageBox.warning(self, f"Lancement de {nom_outil}", message)
 
     # Le chemin du convertisseur était figé sur "<dossier de ui.py>/hardware/",
     # alors qu'il vit le plus souvent à la racine, à côté de ui.py. On cherche
